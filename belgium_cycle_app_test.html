@@ -9,13 +9,16 @@
     html,body,#map{height:100%;margin:0;padding:0}
     #map{position:relative}
     .locStatus{position:absolute;top:10px;left:50%;transform:translateX(-50%);background:#fff;border-radius:4px;padding:4px 8px;font-size:.8rem;box-shadow:0 1px 4px rgba(0,0,0,.3);z-index:1000}
-    #enableLocBtn{position:absolute;bottom:20px;left:50%;transform:translateX(-50%);background:#136aec;color:#fff;border:none;border-radius:30px;padding:10px 18px;font-size:.9rem;box-shadow:0 2px 6px rgba(0,0,0,.25);cursor:pointer;z-index:1000}
+    #enableLocBtn{position:absolute;bottom:70px;left:50%;transform:translateX(-50%);background:#136aec;color:#fff;border:none;border-radius:30px;padding:10px 18px;font-size:.9rem;box-shadow:0 2px 6px rgba(0,0,0,.25);cursor:pointer;z-index:1000}
+    #recenterBtn{position:absolute;bottom:20px;left:50%;transform:translateX(-50%);background:#fff;color:#136aec;border:2px solid #136aec;border-radius:30px;padding:8px 18px;font-size:.9rem;box-shadow:0 2px 6px rgba(0,0,0,.25);cursor:pointer;z-index:1000}
+    #recenterBtn.hidden{display:none}
   </style>
 </head>
 <body>
   <div id="map"></div>
   <div id="locStatus" class="locStatus">Kaart wordt geladen…</div>
   <button id="enableLocBtn">Toon mijn locatie</button>
+  <button id="recenterBtn" class="hidden">Zoom naar mijn locatie</button>
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script>
@@ -44,13 +47,17 @@
         document.getElementById('locStatus').textContent='Kaart geladen zonder gemeentegrenzen. Klik op de knop om je locatie te tonen.';
       });
 
-    // -------- 4. Geolocation flow (always via button) ----------
+    // -------- 4. Geolocation flow ----------
     const statusEl = document.getElementById('locStatus');
     const btn = document.getElementById('enableLocBtn');
+    const recenterBtn = document.getElementById('recenterBtn');
     let marker, circle;
+    let lastLatLng = null;
+    let firstFix = true;
 
     function updatePos(lat,lng,acc){
       const ll=[lat,lng];
+      lastLatLng = ll;
       if(!marker){
         marker=L.marker(ll,{title:'Uw positie'}).addTo(map);
         circle=L.circle(ll,{radius:acc,color:'#136aec',weight:2,fillOpacity:.15}).addTo(map);
@@ -58,13 +65,17 @@
         marker.setLatLng(ll);
         circle.setLatLng(ll).setRadius(acc);
       }
+      if(firstFix){
+        map.setView(ll, 14, {animate:true});
+        firstFix = false;
+        recenterBtn.classList.remove('hidden');
+      }
       statusEl.textContent=`Locatie: ${lat.toFixed(5)}, ${lng.toFixed(5)} (±${Math.round(acc)} m)`;
     }
 
     function locError(e){
       if(e.code===1){
-        // Permission denied
-        statusEl.innerHTML='⚠️ Locatie‑toestemming geweigerd.<br/>Ga naar <b>Chrome ▸ Site‑instellingen ▸ Locatie</b> en kies "Toestaan", of verwijder de blokkering en klik opnieuw op de knop.';
+        statusEl.innerHTML='⚠️ Locatie‑toestemming geweigerd.';
       }else{
         statusEl.textContent='Locatie niet beschikbaar: '+e.message;
       }
@@ -72,16 +83,15 @@
 
     function requestLocation(){
       if(!window.isSecureContext){
-        statusEl.textContent='⚠️ Open deze pagina via https:// of localhost om geolocatie te gebruiken.';return;
+        statusEl.textContent='⚠️ Open via https:// of localhost om geolocatie te gebruiken.';return;
       }
       if(!('geolocation' in navigator)){
         statusEl.textContent='⚠️ Browser ondersteunt geen geolocatie.';return;
       }
       statusEl.textContent='Locatie wordt opgehaald…';
       navigator.geolocation.getCurrentPosition(
-        (pos)=>{
+        pos=>{
           updatePos(pos.coords.latitude,pos.coords.longitude,pos.coords.accuracy);
-          // start watching after first fix
           navigator.geolocation.watchPosition(
             p=>updatePos(p.coords.latitude,p.coords.longitude,p.coords.accuracy),
             locError,
@@ -93,7 +103,14 @@
       );
     }
 
+    function recenter(){
+      if(lastLatLng){
+        map.setView(lastLatLng, 14, {animate:true});
+      }
+    }
+
     btn.addEventListener('click',requestLocation);
+    recenterBtn.addEventListener('click', recenter);
   </script>
 </body>
 </html>
