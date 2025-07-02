@@ -9,16 +9,16 @@
     html,body,#map{height:100%;margin:0;padding:0}
     #map{position:relative}
     .locStatus{position:absolute;top:10px;left:50%;transform:translateX(-50%);background:#fff;border-radius:4px;padding:4px 8px;font-size:.8rem;box-shadow:0 1px 4px rgba(0,0,0,.3);z-index:1000}
-    #enableLocBtn{position:absolute;bottom:70px;left:50%;transform:translateX(-50%);background:#136aec;color:#fff;border:none;border-radius:30px;padding:10px 18px;font-size:.9rem;box-shadow:0 2px 6px rgba(0,0,0,.25);cursor:pointer;z-index:1000}
-    #recenterBtn{position:absolute;bottom:20px;left:50%;transform:translateX(-50%);background:#fff;color:#136aec;border:2px solid #136aec;border-radius:30px;padding:8px 18px;font-size:.9rem;box-shadow:0 2px 6px rgba(0,0,0,.25);cursor:pointer;z-index:1000}
-    #recenterBtn.hidden{display:none}
+    #enableLocBtn{position:absolute;bottom:80px;left:50%;transform:translateX(-50%);background:#136aec;color:#fff;border:none;border-radius:30px;padding:10px 18px;font-size:.9rem;box-shadow:0 2px 6px rgba(0,0,0,.25);cursor:pointer;z-index:1000}
+    #recenterBtn{position:absolute;bottom:20px;left:50%;transform:translateX(-50%);background:#fff;color:#136aec;border:2px solid #136aec;border-radius:30px;padding:8px 18px;font-size:.9rem;box-shadow:0 2px 6px rgba(0,0,0,.25);cursor:pointer;z-index:1000;opacity:.6;pointer-events:none}
+    #recenterBtn.active{opacity:1;pointer-events:auto}
   </style>
 </head>
 <body>
   <div id="map"></div>
   <div id="locStatus" class="locStatus">Kaart wordt geladen…</div>
   <button id="enableLocBtn">Toon mijn locatie</button>
-  <button id="recenterBtn" class="hidden">Zoom naar mijn locatie</button>
+  <button id="recenterBtn">Zoom naar mijn locatie</button>
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script>
@@ -51,9 +51,11 @@
     const statusEl = document.getElementById('locStatus');
     const btn = document.getElementById('enableLocBtn');
     const recenterBtn = document.getElementById('recenterBtn');
-    let marker, circle;
-    let lastLatLng = null;
-    let firstFix = true;
+    let marker, circle, lastLatLng=null;
+
+    function enableRecenter(){
+      recenterBtn.classList.add('active');
+    }
 
     function updatePos(lat,lng,acc){
       const ll=[lat,lng];
@@ -65,52 +67,30 @@
         marker.setLatLng(ll);
         circle.setLatLng(ll).setRadius(acc);
       }
-      if(firstFix){
-        map.setView(ll, 14, {animate:true});
-        firstFix = false;
-        recenterBtn.classList.remove('hidden');
-      }
       statusEl.textContent=`Locatie: ${lat.toFixed(5)}, ${lng.toFixed(5)} (±${Math.round(acc)} m)`;
+      enableRecenter();
     }
 
     function locError(e){
-      if(e.code===1){
-        statusEl.innerHTML='⚠️ Locatie‑toestemming geweigerd.';
-      }else{
-        statusEl.textContent='Locatie niet beschikbaar: '+e.message;
-      }
+      statusEl.textContent='Locatie niet beschikbaar: '+ (e.message||'Permissie geweigerd');
     }
 
     function requestLocation(){
-      if(!window.isSecureContext){
-        statusEl.textContent='⚠️ Open via https:// of localhost om geolocatie te gebruiken.';return;
-      }
-      if(!('geolocation' in navigator)){
-        statusEl.textContent='⚠️ Browser ondersteunt geen geolocatie.';return;
-      }
+      if(!window.isSecureContext){statusEl.textContent='⚠️ Open via https:// of localhost.';return;}
+      if(!('geolocation' in navigator)){statusEl.textContent='⚠️ Browser ondersteunt geen geolocatie.';return;}
       statusEl.textContent='Locatie wordt opgehaald…';
-      navigator.geolocation.getCurrentPosition(
-        pos=>{
-          updatePos(pos.coords.latitude,pos.coords.longitude,pos.coords.accuracy);
-          navigator.geolocation.watchPosition(
-            p=>updatePos(p.coords.latitude,p.coords.longitude,p.coords.accuracy),
-            locError,
-            {enableHighAccuracy:true,maximumAge:15000,timeout:20000}
-          );
-        },
-        locError,
-        {enableHighAccuracy:true,timeout:10000}
-      );
+      navigator.geolocation.getCurrentPosition(pos=>{
+        updatePos(pos.coords.latitude,pos.coords.longitude,pos.coords.accuracy);
+        navigator.geolocation.watchPosition(p=>updatePos(p.coords.latitude,p.coords.longitude,p.coords.accuracy), locError, {enableHighAccuracy:true,maximumAge:15000,timeout:20000});
+      }, locError, {enableHighAccuracy:true,timeout:10000});
     }
 
     function recenter(){
-      if(lastLatLng){
-        map.setView(lastLatLng, 14, {animate:true});
-      }
+      if(lastLatLng){map.setView(lastLatLng,14,{animate:true});}
     }
 
     btn.addEventListener('click',requestLocation);
-    recenterBtn.addEventListener('click', recenter);
+    recenterBtn.addEventListener('click',recenter);
   </script>
 </body>
 </html>
